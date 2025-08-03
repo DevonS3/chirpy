@@ -1,17 +1,30 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
+
+	"github.com/devons3/chirpy/internal/database"
+	_ "github.com/lib/pq"
 )
 
 func main() {
-	servMux := http.NewServeMux()
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Printf("Error opening database: %s", err)
+	}
+
 	apiCfg := apiConfig{}
+	apiCfg.dbQueries = database.New(db)
+
+	servMux := http.NewServeMux()
 	servMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	servMux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
 	servMux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
@@ -29,6 +42,7 @@ func main() {
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	dbQueries      *database.Queries
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
