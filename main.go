@@ -52,7 +52,7 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	})
 }
 
-func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, _ *http.Request) {
+func (cfg *apiConfig) handlerMetrics(respWriter http.ResponseWriter, _ *http.Request) {
 	body := fmt.Sprintf(`
 		<html>
 		<body>
@@ -61,24 +61,24 @@ func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, _ *http.Request) {
 		</body>
 		</html>
 		`, cfg.fileserverHits.Load())
-	w.Header().Add("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(body))
+	respWriter.Header().Add("Content-Type", "text/html; charset=utf-8")
+	respWriter.WriteHeader(http.StatusOK)
+	respWriter.Write([]byte(body))
 }
 
-func handlerReady(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(200)
-	w.Write([]byte("OK"))
+func handlerReady(resp_writeer http.ResponseWriter, _ *http.Request) {
+	resp_writeer.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	resp_writeer.WriteHeader(200)
+	resp_writeer.Write([]byte("OK"))
 }
 
-func (cfg *apiConfig) handlerReset(w http.ResponseWriter, _ *http.Request) {
+func (cfg *apiConfig) handlerReset(respWriter http.ResponseWriter, _ *http.Request) {
 	cfg.fileserverHits.Store(0)
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Hits reset to 0"))
+	respWriter.WriteHeader(http.StatusOK)
+	respWriter.Write([]byte("Hits reset to 0"))
 }
 
-func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
+func handlerValidateChirp(respWriter http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	type parameters struct {
 		Body string `json:"body"`
@@ -90,7 +90,7 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("Error decoding body: %s", err)
-		w.WriteHeader(500)
+		respWriter.WriteHeader(500)
 		return
 	}
 
@@ -102,13 +102,13 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 
 	const maxChirpLength = 140
 	if len(params.Body) > maxChirpLength {
-		respondWithError(w, 400, "Chirp is too long.")
+		respondWithError(respWriter, 400, "Chirp is too long.")
 		return
 	}
 
 	_, cleanedChirp := cleanChirp(params.Body)
 	respBody.Cleaned_Body = cleanedChirp
-	respondWithJSON(w, 200, respBody)
+	respondWithJSON(respWriter, 200, respBody)
 }
 
 func cleanChirp(chirpOrig string) (bool, string) {
@@ -126,7 +126,7 @@ func cleanChirp(chirpOrig string) (bool, string) {
 	return containsProfanity, cleanedChirp
 }
 
-func respondWithError(w http.ResponseWriter, code int, msg string) {
+func respondWithError(respWriter http.ResponseWriter, code int, msg string) {
 
 	if code > 499 {
 		log.Printf("Responding with 5XX error: %s", msg)
@@ -138,17 +138,17 @@ func respondWithError(w http.ResponseWriter, code int, msg string) {
 		Error: msg,
 	}
 
-	respondWithJSON(w, code, respBody)
+	respondWithJSON(respWriter, code, respBody)
 }
 
-func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+func respondWithJSON(respWriter http.ResponseWriter, code int, payload interface{}) {
+	respWriter.Header().Set("Content-Type", "application/json")
 	data, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("Error marshalling JSON: %s", err)
-		w.WriteHeader(500)
+		respWriter.WriteHeader(500)
 		return
 	}
-	w.WriteHeader(code)
-	w.Write(data)
+	respWriter.WriteHeader(code)
+	respWriter.Write(data)
 }
